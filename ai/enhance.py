@@ -4,16 +4,13 @@ import sys
 
 import dotenv
 import argparse
-
+from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.prompts import PromptTemplate
 import langchain_core.exceptions
 from langchain_openai import ChatOpenAI
-from langchain.prompts import (
-  ChatPromptTemplate,
-  SystemMessagePromptTemplate,
-  HumanMessagePromptTemplate,
-)
 from structure import Structure
 if os.path.exists('.env'):
+    print('Load .env', file=sys.stderr)
     dotenv.load_dotenv()
 template = open("template.txt", "r").read()
 system = open("system.txt", "r").read()
@@ -26,7 +23,8 @@ def parse_args():
 
 def main():
     args = parse_args()
-    model_name = os.environ.get("MODEL_NAME", 'deepseek-chat')
+    model_name = os.environ.get("MODEL_NAME", 'deepseek/deepseek-chat-v3-0324:free')
+    model_base_url = os.environ.get("MODEL_BASE_URL", 'https://openrouter.ai/api/v1')
     language = os.environ.get("LANGUAGE", 'Chinese')
 
     data = []
@@ -45,22 +43,47 @@ def main():
 
     print('Open:', args.data, file=sys.stderr)
 
-    llm = ChatOpenAI(model=model_name).with_structured_output(Structure, method="function_calling")
-    print('Connect to:', model_name, file=sys.stderr)
-    prompt_template = ChatPromptTemplate.from_messages([
-        SystemMessagePromptTemplate.from_template(system),
-        HumanMessagePromptTemplate.from_template(template=template)
-    ])
+    llm = ChatOpenAI(model=model_name,
+                     base_url=model_base_url)
+    
+    # 创建一个包含结构信息的JSON提示模板
+    json_template = """
+    {system}
 
-    chain = prompt_template | llm
+    {template}
+
+    请以JSON格式回答，必须包含以下字段：
+    {{
+    "tldr": "简短摘要",
+    "motivation": "研究动机",
+    "method": "使用方法",
+    "result": "研究结果",
+    "conclusion": "结论"
+    }}
+
+    语言: {language}
+    内容: {content}
+    """
+    
+    parser = JsonOutputParser(pydantic_object=Structure)
+    
+    print('Connect to:', model_name, file=sys.stderr)
+    prompt = PromptTemplate(
+        template=json_template,
+        input_variables=["content", "language"],
+        partial_variables={"system": system, "template": template}
+    )
+
+    chain = prompt | llm | parser
 
     for idx, d in enumerate(data):
         try:
-            response: Structure = chain.invoke({
+            response = chain.invoke({
                 "language": language,
                 "content": d['summary']
             })
-            d['AI'] = response.model_dump()
+            d['AI'] = response
+            print(response)
         except langchain_core.exceptions.OutputParserException as e:
             print(f"{d['id']} has an error: {e}", file=sys.stderr)
             d['AI'] = {
