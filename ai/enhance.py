@@ -24,7 +24,7 @@ def parse_args():
 def main():
     args = parse_args()
     model_name = os.environ.get("MODEL_NAME", 'deepseek/deepseek-chat-v3-0324:free')
-    model_base_url = os.environ.get("MODEL_BASE_URL", 'https://openrouter.ai/api/v1')
+    openai_base_url = os.environ.get("OPENAI_BASE_URL", 'https://openrouter.ai/api/v1')
     language = os.environ.get("LANGUAGE", 'Chinese')
 
     data = []
@@ -44,7 +44,7 @@ def main():
     print('Open:', args.data, file=sys.stderr)
 
     llm = ChatOpenAI(model=model_name,
-                     base_url=model_base_url)
+                     base_url=openai_base_url)
     
     # 创建一个包含结构信息的JSON提示模板
     json_template = """
