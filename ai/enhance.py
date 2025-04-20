@@ -83,7 +83,7 @@ def main():
                 "content": d['summary']
             })
             d['AI'] = response
-            print(response)
+            # print(response)
         except langchain_core.exceptions.OutputParserException as e:
             print(f"{d['id']} has an error: {e}", file=sys.stderr)
             d['AI'] = {
